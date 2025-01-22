@@ -5,13 +5,12 @@
   "scripts": {
     "dev": "nodemon api/index.js",
     "start": "node api/index.js",
-    "build": "npm install && cd client && npm install && npm run build",
-    "postinstall": "if [ \"$NODE_ENV\" = \"production\" ]; then cd client && npm install && npm run build; fi"
+    "build": "npm install && cd client && npm install --production=false && npm run build",
+    "postinstall": "if [ \"$NODE_ENV\" = \"production\" ]; then cd client && npm install --production=false && npm run build; fi"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.5",
@@ -32,8 +31,5 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.9"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }
