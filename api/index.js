@@ -21,7 +21,7 @@ const { app, server } = require("./utils/socket");
 //database connect
 dbConnection();
 
-const __dirname = path.resolve();
+// const __dirname = path.resolve();
 
 //middlewares
 app.use(express.static(path.join(__dirname, "uploads")));
@@ -47,7 +47,10 @@ app.use(
 // CORS setup
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.FRONTEND_URL
+        : "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
@@ -63,7 +66,12 @@ if (process.env.NODE_ENV === "development") {
 //mout routes
 mouteRoutes(app);
 
-app.use(express.static(path.join(__dirname, "client/dist")));
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  });
+}
 // app.use(express.static(path.join(__dirname, "uploads")));
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
