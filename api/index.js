@@ -21,6 +21,8 @@ const { app, server } = require("./utils/socket");
 //database connect
 dbConnection();
 
+const __dirname = path.resolve();
+
 //middlewares
 app.use(express.static(path.join(__dirname, "uploads")));
 
