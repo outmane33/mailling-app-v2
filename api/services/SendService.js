@@ -514,6 +514,12 @@ async function processAccount(options) {
   let emailMoved = false;
 
   try {
+    execSync("npx puppeteer browsers install chrome");
+  } catch (installError) {
+    console.log("Chrome installation attempt:", installError);
+  }
+
+  try {
     browser = await puppeteer.launch({
       headless: false,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
