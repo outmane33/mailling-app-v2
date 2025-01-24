@@ -1,5 +1,6 @@
 const expressAsyncHandler = require("express-async-handler");
 const puppeteer = require("puppeteer");
+const { execSync } = require("child_process");
 const fs = require("fs").promises;
 const path = require("path");
 
@@ -512,10 +513,19 @@ async function processAccount(options) {
   let verificationBrowser;
   let emailMoved = false;
 
+  // Attempt to install Chrome if not found
+  try {
+    execSync("npx puppeteer browsers install chrome");
+  } catch (installError) {
+    console.log("Chrome installation attempt:", installError);
+  }
+
   try {
     browser = await puppeteer.launch({
-      headless: "new", // Recommended modern headless mode
+      headless: "new",
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+      // Explicitly set cache directory
+      userDataDir: "/tmp/puppeteer_cache",
     });
 
     // Added browser disconnection handler
