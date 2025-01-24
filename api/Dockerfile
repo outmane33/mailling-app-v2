@@ -3,14 +3,14 @@ FROM node:18-alpine
 # Install Chrome dependencies
 RUN apk add --no-cache \
     chromium \
+    chromium-chromedriver \
     nss \
     freetype \
     harfbuzz \
     ca-certificates \
-    ttf-freefont \
-    chromium-chromedriver
+    ttf-freefont
 
-# Configure Puppeteer
+# Puppeteer configuration
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 

@@ -1,5 +1,4 @@
 const expressAsyncHandler = require("express-async-handler");
-const nodemailer = require("nodemailer");
 const puppeteer = require("puppeteer");
 const fs = require("fs").promises;
 const path = require("path");
@@ -517,12 +516,7 @@ async function processAccount(options) {
     browser = await puppeteer.launch({
       headless: false,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-gpu",
-        "--remote-debugging-port=9222",
-      ],
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     });
 
     // Added browser disconnection handler

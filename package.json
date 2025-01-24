@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "chromium": "^3.0.3",
     "compression": "^1.7.5",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -29,7 +28,6 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
     "puppeteer": "^24.1.1",
-    "puppeteer-core": "^24.1.1",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
