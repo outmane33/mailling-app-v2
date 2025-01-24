@@ -517,7 +517,7 @@ async function processAccount(options) {
     browser = await puppeteer.launch({
       headless: false,
       ignoreHTTPSErrors: true,
-      executablePath: "/usr/bin/google-chrome", // or '/usr/bin/chromium'
+      executablePath: "/usr/bin/chromium",
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     });
 
