@@ -2,13 +2,18 @@ services:
   - type: web
     name: mailing-app
     env: node
-    buildCommand: npm run build
+    buildCommand: |
+      npm run build
+      sudo apt-get update
+      sudo apt-get install -y chromium-browser
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 8000
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: true
       - key: FRONTEND_URL
         sync: false
       - key: JWT_SECRET

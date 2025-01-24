@@ -517,11 +517,8 @@ async function processAccount(options) {
     browser = await puppeteer.launch({
       headless: false,
       ignoreHTTPSErrors: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-features=DesktopPWAPermissionRequests",
-      ],
+      executablePath: "/usr/bin/google-chrome", // or '/usr/bin/chromium'
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     });
 
     // Added browser disconnection handler
