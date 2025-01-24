@@ -3,6 +3,7 @@ const ApiError = require("../utils/apiError");
 const SenderGmail = require("../models/sender_Gmail_Model");
 const Recipiente_Charter = require("../models/recipiente_Charter_Model");
 const Recipiente_RR = require("../models/recipiente_RR_Model");
+const SenderOutlook = require("../models/senderOutlookModel");
 
 exports.getAllSenders = expressAsyncHandler(async (req, res) => {
   const { isp } = req.params;
@@ -12,17 +13,24 @@ exports.getAllSenders = expressAsyncHandler(async (req, res) => {
       {},
       { _id: false, email: true, app_password: true }
     );
+  } else if (isp == "outlook") {
+    emails = await SenderOutlook.find(
+      {},
+      { _id: false, email: true, app_password: true, recovery_email: true }
+    );
   }
   res.status(200).json({ emails });
 });
 
 exports.getAllSendersCount = expressAsyncHandler(async function (req, res) {
   const gmailCount = await SenderGmail.countDocuments();
-  const totalCount = gmailCount;
+  const outlookCount = await SenderOutlook.countDocuments();
+  const totalCount = gmailCount + outlookCount;
 
   res.status(200).json({
     counts: {
       gmail: gmailCount,
+      outlook: outlookCount,
       total: totalCount,
     },
   });

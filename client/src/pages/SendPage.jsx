@@ -26,7 +26,6 @@ export default function SendPage() {
         sendTest();
         break;
       case "Drop":
-        // sendDrop();
         setIsModalOpen(true);
         break;
       case "Help":

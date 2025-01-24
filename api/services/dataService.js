@@ -1,14 +1,14 @@
 const expressAsyncHandler = require("express-async-handler");
 const Recipiente_Charter = require("../models/recipiente_Charter_Model");
 const Recipiente_RR = require("../models/recipiente_RR_Model");
-const SenderGmail = require("../models/sender_Gmail_Model");
 const ApiError = require("../utils/apiError");
+const Recipiente_Gmail = require("../models/recipiente_Gmail_Model");
 
 // Add all your models in this object
 let models = {
   Recipiente_Charter_1: Recipiente_Charter,
   Recipiente_RR_1: Recipiente_RR,
-  // SenderGmail_1: SenderGmail,
+  Recipiente_Gmail_1: Recipiente_Gmail,
 };
 
 // Get data by ISP & COUNTRY

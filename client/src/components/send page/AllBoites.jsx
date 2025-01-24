@@ -4,18 +4,11 @@ import { useSendStore } from "../../store/useSendStore";
 export default function AllBoites() {
   const { senders } = useBoiteStore();
   const { login, setLogin } = useSendStore();
-
   const handleSelectionChange = (event) => {
     const selectedOptions = Array.from(event.target.selectedOptions)
-      .map((option) => {
-        const sender = senders.find(
-          (sender) => sender.app_password === option.value
-        );
-        return sender
-          ? { email: sender.email, app_password: sender.app_password }
-          : null;
-      })
+      .map((option) => senders.find((sender) => sender.email === option.value))
       .filter(Boolean);
+
     setLogin(selectedOptions);
   };
 
@@ -29,7 +22,7 @@ export default function AllBoites() {
         onChange={handleSelectionChange}
       >
         {senders.map((sender) => (
-          <option key={sender.email} value={sender.app_password}>
+          <option key={sender.email} value={sender.email}>
             {sender.email}
           </option>
         ))}

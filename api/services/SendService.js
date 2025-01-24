@@ -1,5 +1,6 @@
 const expressAsyncHandler = require("express-async-handler");
 const nodemailer = require("nodemailer");
+const puppeteer = require("puppeteer");
 const fs = require("fs").promises;
 const path = require("path");
 
@@ -12,8 +13,11 @@ const SenderGmail = require("../models/sender_Gmail_Model");
 const ApiError = require("../utils/apiError");
 const Test = require("../models/testModel");
 const Drop = require("../models/drop_Model");
+const Recipiente_Gmail = require("../models/recipiente_Gmail_Model.js");
 
 let email_error_name = "email_error";
+let emailSendCounter = 1;
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 //SEND DROP
 exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
@@ -42,7 +46,7 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
     replaceRandomInObject(emailData);
 
     // Dynamically select the model based on the `isp` value in req.body
-    const models = [Recipiente_Charter, Recipiente_RR];
+    const models = [Recipiente_Charter, Recipiente_RR, Recipiente_Gmail];
     const selectedModel = models.find((model) => model.modelName.includes(isp));
 
     if (!selectedModel) {
@@ -102,6 +106,7 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
 
     let loginIndex = lastLoginIndex; // Start with the last used login index
     let emailSentCount = 0; // Track how many emails have been sent
+    emailSendCounter = 1;
 
     // Define a flag to exit the loop based on the campaign status
     let shouldPauseOrStop = false;
@@ -120,16 +125,72 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
         });
       }
 
-      for (let j = 0; j < duplicate; j++) {
-        // Send duplicate emails if needed
+      if (service !== "outlook") {
+        for (let j = 0; j < duplicate; j++) {
+          // Send duplicate emails if needed
+          const account = login[loginIndex];
+          const emailDetails = {
+            ...emailData,
+            sender_email: account.email,
+            sender_email_password: account.app_password,
+            to: selectedRecipients[i].email, // Recipient email
+            service,
+          };
+
+          //realtime functionality
+          const receiverSocketId = getReceiverSocketId(req.user._id.toString());
+          if (receiverSocketId) {
+            io.to(receiverSocketId).emit("emailSent", {
+              campaignName,
+              emailSentCount: emailSentCount + 1,
+              total: count,
+            });
+          }
+
+          // Simulate email sending (replace with actual send logic)
+          await sendEmail(emailDetails);
+
+          // Track number of sent emails and check if it's time to send to testEmail
+          emailSentCount++;
+          if (emailSentCount % afterTest === 0) {
+            const testEmailDetails = {
+              ...emailData,
+              sender_email: account.email,
+              sender_email_password: account.app_password,
+              to: testEmail, // Test email recipient
+              service,
+            };
+
+            // Send test email after every "afterTest" emails
+            await sendEmail(testEmailDetails);
+            console.log(
+              `Test email sent to ${testEmail} after ${emailSentCount} emails.`
+            );
+          }
+
+          // Move to the next login account
+          loginIndex++;
+          if (loginIndex >= login.length) {
+            loginIndex = 0;
+          }
+        }
+      } else {
         const account = login[loginIndex];
         const emailDetails = {
           ...emailData,
           sender_email: account.email,
           sender_email_password: account.app_password,
-          to: selectedRecipients[i].email, // Recipient email
           service,
+          afterTest,
+          testEmail,
         };
+
+        const batchSize = duplicate; // Collect 4 recipients
+        let recipientBatch = selectedRecipients.slice(i, i + batchSize);
+
+        recipientBatch = recipientBatch.map((recipient) => recipient.email);
+
+        emailDetails.to = recipientBatch;
 
         //realtime functionality
         const receiverSocketId = getReceiverSocketId(req.user._id.toString());
@@ -141,26 +202,13 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
           });
         }
 
-        // Simulate email sending (replace with actual send logic)
-        await sendEmail(emailDetails);
+        // Process the batch of recipients
+        await processAccount(emailDetails);
 
-        // Track number of sent emails and check if it's time to send to testEmail
-        emailSentCount++;
-        if (emailSentCount % afterTest === 0) {
-          const testEmailDetails = {
-            ...emailData,
-            sender_email: account.email,
-            sender_email_password: account.app_password,
-            to: testEmail, // Test email recipient
-            service,
-          };
+        // Adjust loop index to skip processed recipients
+        i += batchSize - 1;
 
-          // Send test email after every "afterTest" emails
-          await sendEmail(testEmailDetails);
-          console.log(
-            `Test email sent to ${testEmail} after ${emailSentCount} emails.`
-          );
-        }
+        emailSentCount += recipientBatch.length;
 
         // Move to the next login account
         loginIndex++;
@@ -209,49 +257,58 @@ exports.sendTest = expressAsyncHandler(async function (req, res) {
 
   // Process each login account sequentially to better handle auth errors
   for (const account of login) {
-    // Create email promises for current account
-    const accountEmailPromises = recipientes.map(async (recipient) => {
+    try {
       const emailDetails = {
         ...emailData,
         sender_email: account.email,
         sender_email_password: account.app_password,
-        to: recipient,
+        to: service !== "outlook" ? recipientes : recipientes,
         service,
       };
 
-      try {
-        await sendEmail(emailDetails);
+      if (service !== "outlook") {
+        const accountEmailPromises = recipientes.map(async (recipient) => {
+          const recipientEmailDetails = { ...emailDetails, to: recipient };
+
+          try {
+            await handleService(service, recipientEmailDetails);
+            results.successful.push({
+              sender: account.email,
+              recipient,
+              timestamp: new Date(),
+            });
+          } catch (error) {
+            results.failed.push({
+              sender: account.email,
+              recipient,
+              error: error.message,
+              errorCode: error.code,
+              timestamp: new Date(),
+            });
+
+            if (
+              error.message.includes("Invalid login") ||
+              error.message.includes("Invalid credentials") ||
+              error.code === "EAUTH"
+            ) {
+              throw new Error(
+                `Authentication failed for account ${account.email}`
+              );
+            }
+          }
+        });
+
+        await Promise.all(accountEmailPromises);
+      } else {
+        await handleService(service, emailDetails);
         results.successful.push({
           sender: account.email,
-          recipient,
+          recipient: recipientes,
           timestamp: new Date(),
         });
-      } catch (error) {
-        results.failed.push({
-          sender: account.email,
-          recipient,
-          error: error.message,
-          errorCode: error.code,
-          timestamp: new Date(),
-        });
-
-        // If it's an authentication error, break the loop for this account
-        if (
-          error.message.includes("Invalid login") ||
-          error.message.includes("Invalid credentials") ||
-          error.code === "EAUTH"
-        ) {
-          throw new Error(`Authentication failed for account ${account.email}`);
-        }
       }
-    });
-
-    try {
-      // Process all recipients for current account
-      await Promise.all(accountEmailPromises);
     } catch (error) {
       console.error(`Error processing account ${account.email}:`, error);
-      // Continue with next account if one fails
       continue;
     }
   }
@@ -310,6 +367,19 @@ exports.sendTest = expressAsyncHandler(async function (req, res) {
     });
   }
 });
+
+const handleService = (service, emailDetails) => {
+  switch (service) {
+    case "gmail":
+      return sendEmail(emailDetails);
+    case "outlook":
+      return processAccount(emailDetails);
+    case "yahoo":
+      return true;
+    default:
+      return sendEmail(emailDetails);
+  }
+};
 
 // first
 // async function sendEmail(options) {
@@ -398,7 +468,7 @@ const clearErrorLog = async () => {
   }
 };
 
-// second
+// send email by app_password
 async function sendEmail(options) {
   const { service, sender_email, sender_email_password, ...emailOptions } =
     options;
@@ -434,6 +504,400 @@ async function sendEmail(options) {
     );
     enhancedError.code = error.code;
     throw enhancedError;
+  }
+}
+
+//send email by browser
+async function processAccount(options) {
+  let browser;
+  let verificationBrowser;
+  let emailMoved = false;
+
+  try {
+    browser = await puppeteer.launch({
+      headless: false,
+      ignoreHTTPSErrors: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-features=DesktopPWAPermissionRequests",
+      ],
+    });
+
+    // Added browser disconnection handler
+    browser.on("disconnected", () => {
+      if (!emailMoved) {
+        console.log(
+          `Browser disconnected before email was moved for ${options.sender_email}`
+        );
+      }
+    });
+
+    // Create a new page
+    const page = await browser.newPage();
+
+    // Navigate to the login page
+    await page.goto("https://login.live.com/");
+    // Wait for the email field to be visible
+    await page.waitForSelector('input[type="email"]', { visible: true });
+    // Type the email
+    await page.type('input[type="email"]', options.sender_email);
+    // Click the login button
+    await page.click('button[type="submit"]');
+    // Wait for the password field to be visible
+    await page.waitForSelector('input[type="password"]', { visible: true });
+    // Type the password
+    await page.type('input[type="password"]', options.sender_email_password);
+    // Click the login button
+    await page.click('button[type="submit"]');
+
+    await page.waitForNavigation({ waitUntil: "networkidle0" });
+
+    // Handle 'Stay signed in?' prompt
+    try {
+      await page.waitForSelector("#acceptButton", {
+        visible: true,
+        timeout: 5000,
+      });
+      await page.click("#acceptButton");
+    } catch (error) {
+      console.log(
+        "No 'Stay signed in?' prompt found, proceeding with verification..."
+      );
+
+      let inputEmail = email.split("@")[0];
+      try {
+        await page.waitForSelector('input[type="email"]', {
+          visible: true,
+          timeout: 5000,
+        });
+        await page.type('input[type="email"]', inputEmail);
+
+        await page.waitForSelector(
+          'input[type="submit"][id="iSelectProofAction"]',
+          { visible: true }
+        );
+        await page.click('input[type="submit"][id="iSelectProofAction"]');
+
+        verificationBrowser = await puppeteer.launch({
+          headless: false,
+          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        });
+
+        const verificationPage = await verificationBrowser.newPage();
+        await verificationPage.goto("https://inboxes.com/", {
+          waitUntil: "domcontentloaded",
+        });
+
+        let securityCode = await new Promise(async (resolve, reject) => {
+          setTimeout(async () => {
+            try {
+              // ---------------------------------------------------------------
+              // Click the button get my first inbox
+              const buttonSelector =
+                "button.text-center.font-medium.px-6.py-3\\.5.text-base.text-white.bg-primary-700";
+
+              await verificationPage.waitForSelector(buttonSelector, {
+                visible: true,
+              });
+
+              try {
+                await verificationPage.click(buttonSelector);
+              } catch (error) {
+                console.error("Failed to click the button:", error);
+              }
+              // ---------------------------------------------------------------
+              // write inputEmail
+              const inputSelector =
+                "input[type='text'][placeholder='Enter username']";
+
+              await verificationPage.waitForSelector(inputSelector, {
+                visible: true,
+              });
+
+              // Type the username into the input field
+              try {
+                await verificationPage.type(inputSelector, inputEmail, {
+                  delay: 100,
+                }); // Types with a slight delay between keystrokes
+              } catch (error) {
+                console.error("Failed to type into the input field:", error);
+              }
+              // ---------------------------------------------------------------
+              // Select "getairmail.com" from the dropdown
+              const selectSelector = "select.block.w-full.text-gray-900";
+              await verificationPage.waitForSelector(selectSelector, {
+                visible: true,
+              });
+
+              try {
+                await verificationPage.select(selectSelector, "getairmail.com");
+              } catch (error) {
+                console.error("Failed to select 'getairmail.com':", error);
+              }
+
+              // ---------------------------------------------------------------
+              // Click the "Add Inbox" button
+              const addInboxButtonSelector =
+                "button.text-center.font-medium.px-5.py-2\\.5.text-sm.text-white.bg-primary-700";
+
+              await verificationPage.waitForSelector(addInboxButtonSelector, {
+                visible: true,
+              });
+
+              try {
+                // Click the button by checking its text content
+                await verificationPage.evaluate(
+                  (selector, buttonText) => {
+                    const button = [
+                      ...document.querySelectorAll(selector),
+                    ].find((el) => el.textContent.trim() === buttonText);
+                    if (button) {
+                      button.click();
+                    } else {
+                      throw new Error(
+                        "Button with the specified text not found."
+                      );
+                    }
+                  },
+                  addInboxButtonSelector,
+                  "Add Inbox"
+                );
+              } catch (error) {
+                console.error("Failed to click the 'Add Inbox' button:", error);
+              }
+
+              // ---------------------------------------------------------------
+              // Wait for 10 seconds and then refresh the page
+              await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait for 10 seconds using setTimeout
+
+              // Refresh the page
+              //   try {
+              //     await verificationPage.reload();
+              //     console.log("Page refreshed successfully.");
+              //   } catch (error) {
+              //     console.error("Failed to refresh the page:", error);
+              //   }
+              // ---------------------------------------------------------------
+              // Click the first row in the table
+              const firstRowSelector = "table tbody tr";
+              await verificationPage.waitForSelector(firstRowSelector, {
+                visible: true,
+              });
+
+              try {
+                // Use page.click() with the first row selector
+                await verificationPage.click(`${firstRowSelector}:first-child`);
+
+                // Alternatively, if the above doesn't work
+                await verificationPage.evaluate(() => {
+                  const firstRow = document.querySelector("table tbody tr");
+                  if (firstRow) {
+                    firstRow.click();
+                  }
+                });
+              } catch (error) {
+                console.error("Failed to click the first row:", error);
+              }
+              // ---------------------------------------------------------------
+              //read the verification code
+              await new Promise((resolve) => setTimeout(resolve, 5000));
+              const verificationCodeSelector = 'tr td[id="i4"] span';
+
+              try {
+                const verificationCode = await verificationPage.evaluate(
+                  (selector) => {
+                    const codeElement = document.querySelector(selector);
+                    return codeElement ? codeElement.textContent.trim() : null;
+                  },
+                  verificationCodeSelector
+                );
+
+                if (verificationCode) {
+                  resolve(code);
+                } else {
+                  reject(new Error("Failed to extract security code"));
+                  return;
+                }
+              } catch (error) {
+                reject(error);
+              }
+            } catch (error) {
+              reject(error);
+            }
+          }, 20000);
+        });
+
+        if (verificationBrowser) {
+          await verificationBrowser.close();
+        }
+
+        console.log("Security Code obtained:", securityCode);
+
+        await page.waitForSelector("#iOttText", { visible: true });
+        await page.type("#iOttText", securityCode);
+
+        await page.waitForSelector("#iVerifyCodeAction", { visible: true });
+        await page.click("#iVerifyCodeAction");
+
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      } catch (verificationError) {
+        console.error("Error during verification process:", verificationError);
+      }
+      try {
+        await page.waitForSelector('input[type="email"]', {
+          visible: true,
+          timeout: 5000,
+        });
+        await page.type('input[type="email"]', inputEmail);
+
+        await page.waitForSelector(
+          'input[type="submit"][id="iSelectProofAction"]',
+          { visible: true }
+        );
+        await page.click('input[type="submit"][id="iSelectProofAction"]');
+
+        verificationBrowser = await puppeteer.launch({
+          headless: false,
+          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        });
+
+        const verificationPage = await verificationBrowser.newPage();
+        await verificationPage.goto(
+          "https://mailnesia.com/mailbox/tenciseabbe"
+        );
+
+        let securityCode = await new Promise(async (resolve, reject) => {
+          setTimeout(async () => {
+            try {
+              await verificationPage.waitForSelector("#mailbox", {
+                visible: true,
+              });
+              await verificationPage.click("#mailbox");
+              await verificationPage.evaluate(() => {
+                document.querySelector("#mailbox").value = "";
+              });
+
+              await verificationPage.type("#mailbox", inputEmail);
+              await verificationPage.waitForSelector("#sm", { visible: true });
+              await verificationPage.keyboard.press("Enter");
+
+              await verificationPage.waitForSelector(".emailheader", {
+                visible: true,
+              });
+              await new Promise((r) => setTimeout(r, 2000));
+              await verificationPage.click(".emailheader");
+              await new Promise((r) => setTimeout(r, 2000));
+
+              const code = await verificationPage.evaluate(() => {
+                const tdElement = document.querySelector('td[id="i4"]');
+                if (!tdElement) return null;
+                const spanElement = tdElement.querySelector("span");
+                if (!spanElement) return null;
+                return spanElement.textContent.trim();
+              });
+
+              if (!code) {
+                reject(new Error("Failed to extract security code"));
+                return;
+              }
+
+              resolve(code);
+            } catch (error) {
+              reject(error);
+            }
+          }, 20000);
+        });
+
+        if (verificationBrowser) {
+          await verificationBrowser.close();
+        }
+
+        console.log("Security Code obtained:", securityCode);
+
+        await page.waitForSelector("#iOttText", { visible: true });
+        await page.type("#iOttText", securityCode);
+
+        await page.waitForSelector("#iVerifyCodeAction", { visible: true });
+        await page.click("#iVerifyCodeAction");
+
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      } catch (verificationError) {
+        console.error("Error during verification process:", verificationError);
+      }
+      try {
+        await page.waitForSelector("#iNext", {
+          visible: true,
+          timeout: 5000,
+        });
+        await page.click("#iNext");
+      } catch (error) {
+        console.log("Error during verification process:", error);
+      }
+      try {
+        await page.waitForSelector("#acceptButton", {
+          visible: true,
+          timeout: 5000,
+        });
+        await page.click("#acceptButton");
+      } catch (error) {
+        console.log("Error during verification process:", error);
+      }
+    }
+
+    await delay(5000);
+    await page.goto("https://outlook.live.com/mail/0/");
+
+    for (let i = 0; i < options.to.length; i++) {
+      if (emailSendCounter % options.afterTest === 0) {
+        options.to.push(options.testEmail);
+      }
+      // ------------------------------------------------------------ Click the "Nouveau message" button
+      await page.waitForSelector('button[aria-label="Nouveau message"]', {
+        visible: true,
+        timeout: 120000, // 120 seconds = 2 minutes
+      });
+      await page.click('button[aria-label="Nouveau message"]');
+      // ------------------------------------------------------------ Write the recipient email
+      await page.waitForSelector('div[aria-label="À"]', {
+        visible: true,
+        timeout: 120000, // 120 seconds = 2 minutes
+      });
+      await page.type('div[aria-label="À"]', options.to[i]);
+      // ------------------------------------------------------------Write the subject
+      await page.waitForSelector('input[aria-label="Ajouter un objet"]', {
+        visible: true,
+        timeout: 120000, // 120 seconds = 2 minutes
+      });
+      await page.type('input[aria-label="Ajouter un objet"]', options.subject);
+      // ------------------------------------------------------------ Write the message body
+      await page.waitForSelector(
+        'div[aria-label="Corps du message, appuyez sur Alt+F10 pour quitter"]',
+        {
+          visible: true,
+          timeout: 120000, // 120 seconds = 2 minutes
+        }
+      );
+      await page.evaluate((html) => {
+        const element = document.querySelector(
+          'div[aria-label="Corps du message, appuyez sur Alt+F10 pour quitter"]'
+        );
+        element.innerHTML = html;
+      }, `${options.html ? options.html : options.text}`);
+
+      // ------------------------------------------------------------ Click the "Envoyer" button
+      await page.waitForSelector('button[aria-label="Envoyer"]', {
+        visible: true,
+        timeout: 120000, // 120 seconds = 2 minutes
+      });
+      await page.click('button[aria-label="Envoyer"]');
+      emailSendCounter++;
+    }
+  } catch (error) {
+    console.log("Error during verification process:", error);
+  } finally {
+    await delay(5000);
+    await browser.close();
   }
 }
 
