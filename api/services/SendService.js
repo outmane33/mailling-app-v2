@@ -514,8 +514,8 @@ async function processAccount(options) {
 
   try {
     browser = await puppeteer.launch({
-      headless: false,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      headless: true,
+      executablePath: "/usr/bin/chromium-browser",
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     });
 
