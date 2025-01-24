@@ -517,7 +517,12 @@ async function processAccount(options) {
     browser = await puppeteer.launch({
       headless: false,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-gpu",
+        "--remote-debugging-port=9222",
+      ],
     });
 
     // Added browser disconnection handler

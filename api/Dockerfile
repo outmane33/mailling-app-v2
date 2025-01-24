@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-# Install chromium dependencies
+# Install Chrome dependencies
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -8,16 +8,14 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
-    nodejs \
-    npm
+    chromium-chromedriver
 
-# Set environment to use chromium
+# Configure Puppeteer
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 WORKDIR /app
 COPY package*.json ./
-COPY config.env ./
 COPY . .
 
 RUN npm install puppeteer
