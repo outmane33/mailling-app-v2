@@ -1,6 +1,7 @@
 const expressAsyncHandler = require("express-async-handler");
 const nodemailer = require("nodemailer");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
+const chromium = require("chromium");
 const fs = require("fs").promises;
 const path = require("path");
 
@@ -517,7 +518,7 @@ async function processAccount(options) {
     browser = await puppeteer.launch({
       headless: false,
       ignoreHTTPSErrors: true,
-      executablePath: "/usr/bin/chromium",
+      executablePath: chromium.path,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     });
 
