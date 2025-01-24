@@ -514,8 +514,7 @@ async function processAccount(options) {
 
   try {
     browser = await puppeteer.launch({
-      headless: true,
-      executablePath: "/usr/bin/chromium-browser",
+      headless: "new", // Recommended modern headless mode
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     });
 
