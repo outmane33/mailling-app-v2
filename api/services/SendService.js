@@ -513,16 +513,9 @@ async function processAccount(options) {
   let verificationBrowser;
   let emailMoved = false;
 
-  // Attempt to install Chrome if not found
-  try {
-    execSync("npx puppeteer browsers install chrome");
-  } catch (installError) {
-    console.log("Chrome installation attempt:", installError);
-  }
-
   try {
     browser = await puppeteer.launch({
-      headless: "new",
+      headless: false,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
       // Explicitly set cache directory
       userDataDir: "/tmp/puppeteer_cache",
