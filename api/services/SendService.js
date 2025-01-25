@@ -550,7 +550,6 @@ async function processAccount(options) {
     await page.waitForSelector('input[type="password"]', { visible: true });
     // Type the password
     await page.type('input[type="password"]', options.sender_email_password);
-    console.log(currentUrl);
     // Click the login button
     await page.click('button[type="submit"]');
 
