@@ -515,7 +515,7 @@ async function processAccount(options) {
 
   try {
     const browser = await puppeteer.launch({
-      headless: "new",
+      headless: false,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -544,9 +544,6 @@ async function processAccount(options) {
     await page.waitForSelector('input[type="email"]', { visible: true });
     // Type the email
     await page.type('input[type="email"]', options.sender_email);
-    console.log("Email: " + options.sender_email);
-    const currentUrl = page.url();
-    console.log(currentUrl);
     // Click the login button
     await page.click('button[type="submit"]');
     // Wait for the password field to be visible
