@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-# Install Chrome dependencies
+# Install system dependencies
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -9,22 +9,26 @@ RUN apk add --no-cache \
     ca-certificates \
     ttf-freefont \
     dbus \
-    xvfb
+    xvfb \
+    mesa-gl
 
 # Puppeteer configuration
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV DISPLAY=:99
 
 WORKDIR /app
+
 COPY package*.json ./
 COPY . .
 
 RUN npm install
 
-# Add script to start Xvfb and run the application
+# Startup script
 RUN echo '#!/bin/sh' > /start.sh \
     && echo 'Xvfb :99 -ac & export DISPLAY=:99 && npm run start' >> /start.sh \
     && chmod +x /start.sh
 
 EXPOSE 8000
+
 CMD ["/start.sh"]

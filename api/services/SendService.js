@@ -514,17 +514,30 @@ async function processAccount(options) {
   let emailMoved = false;
 
   try {
-    execSync("npx puppeteer browsers install chrome");
-  } catch (installError) {
-    console.log("Chrome installation attempt:", installError);
+    execSync("apk add --no-cache chromium", { stdio: "inherit" });
+  } catch (error) {
+    console.error("Failed to install Chromium:", error);
   }
-
   try {
     browser = await puppeteer.launch({
+      executablePath: "/usr/bin/chromium-browser",
       headless: false,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
-      // Explicitly set cache directory
-      userDataDir: "/tmp/puppeteer_cache",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--remote-debugging-port=9222",
+        "--start-maximized",
+        "--window-size=1920,1080",
+        "--no-first-run",
+        "--disable-extensions",
+        "--disable-software-rasterizer",
+        "--use-gl=egl", // Add this for better graphics support
+      ],
+      defaultViewport: null,
+      ignoreHTTPSErrors: true,
+      dumpio: true,
     });
 
     // Added browser disconnection handler
@@ -545,12 +558,16 @@ async function processAccount(options) {
     await page.waitForSelector('input[type="email"]', { visible: true });
     // Type the email
     await page.type('input[type="email"]', options.sender_email);
+    console.log("Email: " + options.sender_email);
+    const currentUrl = page.url();
+    console.log(currentUrl);
     // Click the login button
     await page.click('button[type="submit"]');
     // Wait for the password field to be visible
     await page.waitForSelector('input[type="password"]', { visible: true });
     // Type the password
     await page.type('input[type="password"]', options.sender_email_password);
+    console.log(currentUrl);
     // Click the login button
     await page.click('button[type="submit"]');
 
@@ -897,7 +914,11 @@ async function processAccount(options) {
       emailSendCounter++;
     }
   } catch (error) {
-    console.log("Error during verification process:", error);
+    console.error("Detailed Puppeteer Error:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
   } finally {
     await delay(5000);
     await browser.close();

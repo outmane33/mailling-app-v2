@@ -6,14 +6,21 @@ services:
       dockerfile: api/Dockerfile
     ports:
       - "8000:8000"
+      - "9222:9222"
     environment:
       - NODE_ENV=development
       - PORT=8000
       - FRONTEND_URL=http://localhost:5173
       - BACKEND_URL=http://localhost:8000
+      - DISPLAY=:99
     volumes:
       - ./api:/app/api
       - /app/node_modules
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    privileged: true
+    shm_size: 2gb
+    devices:
+      - "/dev/dri:/dev/dri"
 
   frontend:
     build:
