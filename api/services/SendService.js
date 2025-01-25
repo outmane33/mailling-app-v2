@@ -515,11 +515,14 @@ async function processAccount(options) {
 
   try {
     const browser = await puppeteer.launch({
-      headless: false,
+      headless: "new",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
+        "--headless", // Explicitly set headless mode
+        "--disable-gpu", // Disable GPU hardware acceleration
+        "--remote-debugging-port=9222", // Add a debugging port
       ],
     });
 
