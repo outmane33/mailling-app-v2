@@ -3,6 +3,7 @@ const puppeteer = require("puppeteer");
 const { execSync } = require("child_process");
 const fs = require("fs").promises;
 const path = require("path");
+const nodemailer = require("nodemailer");
 
 const { getReceiverSocketId, io } = require("../utils/socket.js");
 const { replaceRandomInObject } = require("../utils/randoms");
@@ -514,15 +515,14 @@ async function processAccount(options) {
   let emailMoved = false;
 
   try {
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
       headless: false,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--headless", // Explicitly set headless mode
-        "--disable-gpu", // Disable GPU hardware acceleration
-        "--remote-debugging-port=9222", // Add a debugging port
+        "--disable-gpu",
+        "--disable-software-rasterizer",
       ],
     });
 
