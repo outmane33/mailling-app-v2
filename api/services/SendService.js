@@ -514,11 +514,6 @@ async function processAccount(options) {
   let emailMoved = false;
 
   try {
-    execSync("apk add --no-cache chromium", { stdio: "inherit" });
-  } catch (error) {
-    console.error("Failed to install Chromium:", error);
-  }
-  try {
     const browser = await puppeteer.launch({
       headless: false,
       args: [
