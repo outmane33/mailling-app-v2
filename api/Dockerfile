@@ -1,26 +1,32 @@
 FROM node:18-alpine
 
-# Install chromium and dependencies
+# Install system dependencies
 RUN apk add --no-cache \
     chromium \
     nss \
     freetype \
     harfbuzz \
     ca-certificates \
-    ttf-freefont
+    ttf-freefont \
+    dbus \
+    xvfb \
+    mesa-gl
 
 # Puppeteer configuration
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV DISPLAY=:99
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm install puppeteer
 
 COPY . .
 
-# Additional Render-specific configuration
-ENV NODE_ENV=production
+# Startup script
+RUN echo '#!/bin/sh' > /start.sh \
+    && echo 'Xvfb :99 -ac & npm start' >> /start.sh \
+    && chmod +x /start.sh
 
-CMD ["npm", "start"]
+CMD ["/start.sh"]

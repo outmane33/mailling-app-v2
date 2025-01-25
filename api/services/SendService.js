@@ -520,24 +520,15 @@ async function processAccount(options) {
   }
   try {
     browser = await puppeteer.launch({
-      executablePath: "/usr/bin/chromium-browser",
-      headless: false,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
         "--remote-debugging-port=9222",
-        "--start-maximized",
-        "--window-size=1920,1080",
-        "--no-first-run",
-        "--disable-extensions",
-        "--disable-software-rasterizer",
-        "--use-gl=egl", // Add this for better graphics support
       ],
-      defaultViewport: null,
-      ignoreHTTPSErrors: true,
-      dumpio: true,
     });
 
     // Added browser disconnection handler
