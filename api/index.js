@@ -68,15 +68,16 @@ mouteRoutes(app);
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../client/dist")));
+
   app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "../client/dist/index.html"));
   });
 }
 
-// app.use(express.static(path.join(__dirname, "uploads")));
-// app.get("*", (req, res) => {
-//   res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
-// });
+app.use(express.static(path.join(__dirname, "uploads")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
+});
 //global error handler
 app.use(globalerrorHandler);
 
