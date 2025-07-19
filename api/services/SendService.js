@@ -10,6 +10,7 @@ const { replaceRandomInObject } = require("../utils/randoms");
 const { replacePlaceholders } = require("../utils/replacePlaceholders");
 const Recipiente_Charter = require("../models/recipiente_Charter_Model");
 const Recipiente_RR = require("../models/recipiente_RR_Model");
+const Recipiente_Yahoo = require("../models/recipiente_Yahoo_Model");
 const SenderGmail = require("../models/sender_Gmail_Model");
 const ApiError = require("../utils/apiError");
 const Test = require("../models/testModel");
@@ -47,7 +48,12 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
     replaceRandomInObject(emailData);
 
     // Dynamically select the model based on the `isp` value in req.body
-    const models = [Recipiente_Charter, Recipiente_RR, Recipiente_Gmail];
+   const models = [
+      Recipiente_Charter,
+      Recipiente_RR,
+      Recipiente_Gmail,
+      Recipiente_Yahoo,
+    ];
     const selectedModel = models.find((model) => model.modelName.includes(isp));
 
     if (!selectedModel) {
