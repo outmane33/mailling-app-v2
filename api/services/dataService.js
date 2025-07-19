@@ -16,7 +16,7 @@ let models = {
 
 // Get data by ISP & COUNTRY
 exports.getDataByISP = expressAsyncHandler(async function (req, res, next) {
-    
+    const { isp, country, email_type } = req.body; 
   let result = []; // Array to hold the results
 
   if (isp) {
