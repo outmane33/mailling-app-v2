@@ -26,6 +26,7 @@ export default function SenderIp() {
         <option>gmail</option>
         <option>yahoo</option>
         <option>outlook</option>
+        <option>brevo</option>
       </select>
     </div>
   );

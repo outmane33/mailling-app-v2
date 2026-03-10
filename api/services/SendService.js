@@ -10,11 +10,12 @@ const { replaceRandomInObject } = require("../utils/randoms");
 const { replacePlaceholders } = require("../utils/replacePlaceholders");
 const Recipiente_Charter = require("../models/recipiente_Charter_Model");
 const Recipiente_RR = require("../models/recipiente_RR_Model");
-const SenderGmail = require("../models/sender_Gmail_Model");
+const Recipiente_Yahoo = require("../models/recipiente_Yahoo_Model");
 const ApiError = require("../utils/apiError");
 const Test = require("../models/testModel");
 const Drop = require("../models/drop_Model");
 const Recipiente_Gmail = require("../models/recipiente_Gmail_Model.js");
+const SenderBrevo = require("../models/senderBrevoModel.js");
 
 let email_error_name = "email_error";
 let emailSendCounter = 1;
@@ -47,7 +48,12 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
     replaceRandomInObject(emailData);
 
     // Dynamically select the model based on the `isp` value in req.body
-    const models = [Recipiente_Charter, Recipiente_RR, Recipiente_Gmail];
+    const models = [
+      Recipiente_Charter,
+      Recipiente_RR,
+      Recipiente_Gmail,
+      Recipiente_Yahoo,
+    ];
     const selectedModel = models.find((model) => model.modelName.includes(isp));
 
     if (!selectedModel) {
@@ -101,7 +107,7 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
 
     if (!selectedRecipients.length) {
       return next(
-        new ApiError(`No recipients found matching the criteria.`, 404)
+        new ApiError(`No recipients found matching the criteria.`, 404),
       );
     }
 
@@ -165,7 +171,7 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
             // Send test email after every "afterTest" emails
             await sendEmail(testEmailDetails);
             console.log(
-              `Test email sent to ${testEmail} after ${emailSentCount} emails.`
+              `Test email sent to ${testEmail} after ${emailSentCount} emails.`,
             );
           }
 
@@ -221,7 +227,7 @@ exports.sendDrop = expressAsyncHandler(async function (req, res, next) {
       // After each email is sent, save Drop progress in the database
       await Drop.updateOne(
         { campaignName },
-        { lastStartIndex: startIndex + i + 1, lastLoginIndex: loginIndex }
+        { lastStartIndex: startIndex + i + 1, lastLoginIndex: loginIndex },
       );
     }
 
@@ -267,7 +273,7 @@ exports.sendTest = expressAsyncHandler(async function (req, res) {
         service,
       };
 
-      if (service !== "outlook") {
+      if (service === "outlook") {
         const accountEmailPromises = recipientes.map(async (recipient) => {
           const recipientEmailDetails = { ...emailDetails, to: recipient };
 
@@ -293,7 +299,7 @@ exports.sendTest = expressAsyncHandler(async function (req, res) {
               error.code === "EAUTH"
             ) {
               throw new Error(
-                `Authentication failed for account ${account.email}`
+                `Authentication failed for account ${account.email}`,
               );
             }
           }
@@ -345,8 +351,8 @@ exports.sendTest = expressAsyncHandler(async function (req, res) {
       results.failed.length === 0
         ? 200
         : results.successful.length === 0
-        ? 500
-        : 207; // 207 Multi-Status for partial success
+          ? 500
+          : 207; // 207 Multi-Status for partial success
 
     res.status(status).json({
       message:
@@ -377,53 +383,12 @@ const handleService = (service, emailDetails) => {
       return processAccount(emailDetails);
     case "yahoo":
       return true;
+    case "brevo":
+      return brevoBrowserSend(emailDetails);
     default:
       return sendEmail(emailDetails);
   }
 };
-
-// first
-// async function sendEmail(options) {
-//   const { service, sender_email, sender_email_password, ...emailOptions } =
-//     options;
-
-//   try {
-//     let transporter;
-
-//     if (service === "gmail") {
-//       transporter = nodemailer.createTransport({
-//         service: "gmail",
-//         auth: {
-//           user: sender_email,
-//           pass: sender_email_password,
-//         },
-//       });
-//     } else {
-//       throw new Error(
-//         'Invalid email service provided. Use "gmail" or "outlook" or "yahoo".'
-//       );
-//     }
-
-//     // Verify transporter credentials before sending
-//     await transporter.verify();
-
-//     // Process email options and send
-//     let mailOptions = processEmailOptions(emailOptions, sender_email);
-//     // let info = await transporter.sendMail(mailOptions);
-//     let info = true;
-
-//     return info;
-//   } catch (error) {
-//     // Enhance error message based on error type
-//     let enhancedError = new Error(
-//       error.code === "EAUTH"
-//         ? `Authentication failed for ${sender_email}: Invalid password or authentication settings`
-//         : error.message
-//     );
-//     enhancedError.code = error.code;
-//     throw enhancedError;
-//   }
-// }
 
 // Error logger utility
 const logEmailError = async (error, details) => {
@@ -443,7 +408,7 @@ const logEmailError = async (error, details) => {
     process.cwd(),
     "api",
     "errors",
-    `${email_error_name}.txt`
+    `${email_error_name}.txt`,
   );
 
   try {
@@ -458,7 +423,7 @@ const clearErrorLog = async () => {
     process.cwd(),
     "api",
     "errors",
-    `${email_error_name}.txt`
+    `${email_error_name}.txt`,
   );
   try {
     await fs.writeFile(logFile, "");
@@ -473,7 +438,6 @@ const clearErrorLog = async () => {
 async function sendEmail(options) {
   const { service, sender_email, sender_email_password, ...emailOptions } =
     options;
-
   try {
     let transporter;
 
@@ -487,7 +451,7 @@ async function sendEmail(options) {
       });
     } else {
       throw new Error(
-        'Invalid email service provided. Use "gmail" or "outlook" or "yahoo".'
+        'Invalid email service provided. Use "gmail" or "outlook" or "yahoo".',
       );
     }
 
@@ -501,7 +465,7 @@ async function sendEmail(options) {
     let enhancedError = new Error(
       error.code === "EAUTH"
         ? `Authentication failed for ${sender_email}: Invalid password or authentication settings`
-        : error.message
+        : error.message,
     );
     enhancedError.code = error.code;
     throw enhancedError;
@@ -530,7 +494,7 @@ async function processAccount(options) {
     browser.on("disconnected", () => {
       if (!emailMoved) {
         console.log(
-          `Browser disconnected before email was moved for ${options.sender_email}`
+          `Browser disconnected before email was moved for ${options.sender_email}`,
         );
       }
     });
@@ -564,7 +528,7 @@ async function processAccount(options) {
       await page.click("#acceptButton");
     } catch (error) {
       console.log(
-        "No 'Stay signed in?' prompt found, proceeding with verification..."
+        "No 'Stay signed in?' prompt found, proceeding with verification...",
       );
 
       let inputEmail = email.split("@")[0];
@@ -577,7 +541,7 @@ async function processAccount(options) {
 
         await page.waitForSelector(
           'input[type="submit"][id="iSelectProofAction"]',
-          { visible: true }
+          { visible: true },
         );
         await page.click('input[type="submit"][id="iSelectProofAction"]');
 
@@ -658,12 +622,12 @@ async function processAccount(options) {
                       button.click();
                     } else {
                       throw new Error(
-                        "Button with the specified text not found."
+                        "Button with the specified text not found.",
                       );
                     }
                   },
                   addInboxButtonSelector,
-                  "Add Inbox"
+                  "Add Inbox",
                 );
               } catch (error) {
                 console.error("Failed to click the 'Add Inbox' button:", error);
@@ -712,7 +676,7 @@ async function processAccount(options) {
                     const codeElement = document.querySelector(selector);
                     return codeElement ? codeElement.textContent.trim() : null;
                   },
-                  verificationCodeSelector
+                  verificationCodeSelector,
                 );
 
                 if (verificationCode) {
@@ -755,7 +719,7 @@ async function processAccount(options) {
 
         await page.waitForSelector(
           'input[type="submit"][id="iSelectProofAction"]',
-          { visible: true }
+          { visible: true },
         );
         await page.click('input[type="submit"][id="iSelectProofAction"]');
 
@@ -766,7 +730,7 @@ async function processAccount(options) {
 
         const verificationPage = await verificationBrowser.newPage();
         await verificationPage.goto(
-          "https://mailnesia.com/mailbox/tenciseabbe"
+          "https://mailnesia.com/mailbox/tenciseabbe",
         );
 
         let securityCode = await new Promise(async (resolve, reject) => {
@@ -878,14 +842,17 @@ async function processAccount(options) {
         {
           visible: true,
           timeout: 120000, // 120 seconds = 2 minutes
-        }
+        },
       );
-      await page.evaluate((html) => {
-        const element = document.querySelector(
-          'div[aria-label="Corps du message, appuyez sur Alt+F10 pour quitter"]'
-        );
-        element.innerHTML = html;
-      }, `${options.html ? options.html : options.text}`);
+      await page.evaluate(
+        (html) => {
+          const element = document.querySelector(
+            'div[aria-label="Corps du message, appuyez sur Alt+F10 pour quitter"]',
+          );
+          element.innerHTML = html;
+        },
+        `${options.html ? options.html : options.text}`,
+      );
 
       // ------------------------------------------------------------ Click the "Envoyer" button
       await page.waitForSelector('button[aria-label="Envoyer"]', {
@@ -939,7 +906,7 @@ function processEmailOptions(options, sender_email) {
     replyTo,
     subject,
     text,
-    html: processHtml(html, to, campaignName),
+    html: processHtml(html, { to, campaignName }),
     date,
     headers: {},
   };
@@ -971,18 +938,258 @@ function processHtml(html, to, campaignName) {
   let processed = html.replace(
     /\[open\]/g,
     `tracking/open?email=${encodeURIComponent(
-      to
-    )}&campaign=${encodeURIComponent(campaignName)}`
+      to,
+    )}&campaign=${encodeURIComponent(campaignName)}`,
   );
 
   const trackingUrl = `tracking/click?email=${encodeURIComponent(
-    to
+    to,
   )}&campaign=${encodeURIComponent(
-    campaignName
+    campaignName,
   )}&destination=${encodeURIComponent("https://google.com")}`;
   processed = processed.replace(/\[url\]/g, trackingUrl);
 
   return processed;
+}
+
+async function brevoBrowserSend(options) {
+  let browser;
+  let verificationBrowser;
+
+  const brevoSender = await SenderBrevo.findOne({
+    email: options.sender_email,
+    app_password: options.sender_email_password,
+  }).exec();
+
+  const proxy = brevoSender.proxy.split(":");
+
+  try {
+    browser = await puppeteer.launch({
+      headless: false,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+        `--proxy-server=${proxy[0]}:${proxy[1]}`,
+      ],
+      defaultViewport: null,
+    });
+
+    // Create a new page
+    const page = await browser.newPage();
+    // Login
+    await page.authenticate({
+      username: proxy[2],
+      password: proxy[3],
+    });
+    // Intercept requests
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (
+        request.url().includes("cookie") ||
+        request.url().includes("consent")
+      ) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+    // Navigate to the login page
+    await page.goto("https://app.brevo.com/");
+    await delay(5000);
+    // Wait for the email field to be visible
+    await page.waitForSelector('input[name="email"]', { visible: true });
+    // Type the email
+    await page.type('input[name="email"]', options.sender_email);
+    // Wait for the password field to be visible
+    await page.waitForSelector('input[name="password"]', { visible: true });
+    // Type the password
+    await page.type('input[name="password"]', options.sender_email_password);
+    // Click the login button
+
+    await delay(5000);
+
+    await page.waitForSelector('button[data-testid="submit-button"]', {
+      visible: true,
+    });
+    await page.click('button[data-testid="submit-button"]', { delay: 1000 });
+
+    // -------------------------------------------------------------- click +
+    await page.waitForSelector('button[data-testid="create_cta"]', {
+      visible: true,
+    });
+    await page.click('button[data-testid="create_cta"]', { delay: 1000 });
+
+    // -------------------------------------------------------------- click create compain
+    await delay(5000);
+
+    // Multiple selector strategies
+    const createCampaignButton = await page.evaluateHandle(() => {
+      // Try different selector methods
+      const buttonByText = Array.from(document.querySelectorAll("button")).find(
+        (el) => el.textContent.includes("Create campaign"),
+      );
+
+      const buttonByDataTabindex = document.querySelector(
+        'button[data-tabindex][tabindex="-1"]',
+      );
+
+      return buttonByText || buttonByDataTabindex;
+    });
+
+    if (createCampaignButton) {
+      await createCampaignButton.click();
+    } else {
+      console.log("Create campaign button not found");
+    }
+
+    // -------------------------------------------------------------- click Email
+    await delay(5000);
+    await page.click("#emailMiniCardButton");
+    // -------------------------------------------------------------- type Campaign name
+    // Wait for the email field to be visible
+    await page.waitForSelector('input[type="text"]', { visible: true });
+    // Type the email
+    await page.type('input[type="text"]', options.campaignName);
+
+    // -------------------------------------------------------------- click create campain
+    await delay(5000);
+
+    await page.waitForSelector('button[data-testid="create-campaign"]', {
+      visible: true,
+    });
+    await page.click('button[data-testid="create-campaign"]', { delay: 1000 });
+    // -------------------------------------------------------------- click add recipients
+    await delay(5000);
+
+    await page.waitForSelector('button[id="campaign-creation-to-inactive"]', {
+      visible: true,
+    });
+    await page.click('button[id="campaign-creation-to-inactive"]', {
+      delay: 1000,
+    });
+    // -------------------------------------------------------------- click Send to
+    await delay(5000);
+
+    await page.waitForSelector('div[role="button"]', {
+      visible: true,
+    });
+    await page.click('div[role="button"]', {
+      delay: 1000,
+    });
+    // -------------------------------------------------------------- click the first recipient
+    await delay(5000);
+    await page.click(
+      'div[data-test-id="virtuoso-item-list"] div[data-index="0"] li',
+    );
+    // -------------------------------------------------------------- click Send to
+    await delay(5000);
+
+    await page.waitForSelector('div[role="button"]', {
+      visible: true,
+    });
+    await page.click('div[role="button"]', {
+      delay: 1000,
+    });
+    // -------------------------------------------------------------- click save
+    await delay(5000);
+    await page.waitForSelector('button[data-testid="save-btn"]', {
+      visible: true,
+    });
+    await page.click('button[data-testid="save-btn"]', { delay: 1000 });
+
+    // -------------------------------------------------------------- click add Subject
+    await delay(5000);
+
+    await page.waitForSelector(
+      'button[id="campaign-creation-subject-inactive"]',
+      {
+        visible: true,
+      },
+    );
+    await page.click('button[id="campaign-creation-subject-inactive"]', {
+      delay: 1000,
+    });
+    // -------------------------------------------------------------- type Subject and preview
+    await delay(5000);
+    await page.type("#regularTag-html", options.subject);
+    await page.type("#previewTag-html", options.preview);
+    // -------------------------------------------------------------- click save
+    await delay(5000);
+    await page.waitForSelector('button[id="campaign-creation-subject-save"]', {
+      visible: true,
+    });
+    await page.click('button[id="campaign-creation-subject-save"]', {
+      delay: 1000,
+    });
+    // -------------------------------------------------------------- click start designing
+    await delay(5000);
+
+    await page.waitForSelector('button[data-testid="DesignCampaignButton"]', {
+      visible: true,
+    });
+    await page.click('button[data-testid="DesignCampaignButton"]', {
+      delay: 1000,
+    });
+
+    // -------------------------------------------------------------- click code Your Own
+    await delay(5000);
+    await page.click("#codeYourOwn");
+    // -------------------------------------------------------------- click use html editor
+    await delay(5000);
+
+    await page.waitForSelector('button[data-testid="htmlEditotCard"]', {
+      visible: true,
+    });
+    await page.click('button[data-testid="htmlEditotCard"]', {
+      delay: 1000,
+    });
+    // -------------------------------------------------------------- type html code
+    await delay(5000);
+    await page.type(
+      'textarea[data-testid="textArea"]',
+      `${options.html ? options.html : options.html}`,
+    );
+
+    // -------------------------------------------------------------- click save & quit
+    await delay(5000);
+
+    await page.waitForSelector('button[data-testid="saveAndQuitBtn"]', {
+      visible: true,
+    });
+    await page.click('button[data-testid="saveAndQuitBtn"]', {
+      delay: 1000,
+    });
+    // -------------------------------------------------------------- click Schedule
+    await delay(5000);
+
+    await page.waitForSelector(
+      'button[id="campaign-creation-schedule-button"]',
+      {
+        visible: true,
+      },
+    );
+    await page.click('button[id="campaign-creation-schedule-button"]', {
+      delay: 1000,
+    });
+    // -------------------------------------------------------------- send now
+    await delay(5000);
+
+    await page.waitForSelector('button[data-testid="schdule-btn"]', {
+      visible: true,
+    });
+    await page.click('button[data-testid="schdule-btn"]', {
+      delay: 1000,
+    });
+    // ---------------------------------------------------------------end
+  } catch (err) {
+    console.log(err);
+  } finally {
+    await delay(5000);
+    // if (browser) await browser.close();
+  }
 }
 
 exports.pauseCampaign = expressAsyncHandler(async function (req, res, next) {
@@ -990,7 +1197,7 @@ exports.pauseCampaign = expressAsyncHandler(async function (req, res, next) {
 
   const drop = await Drop.findOneAndUpdate(
     { campaignName },
-    { status: "paused" }
+    { status: "paused" },
   );
   if (!drop) {
     return next(new ApiError(`campaign not found`));
@@ -1006,7 +1213,7 @@ exports.resumeCampaign = expressAsyncHandler(async function (req, res, next) {
 
   const drop = await Drop.findOneAndUpdate(
     { campaignName },
-    { status: "active" }
+    { status: "active" },
   );
   if (!drop) {
     return next(new ApiError(`campaign not found`));
@@ -1032,7 +1239,7 @@ exports.readErrorLog = expressAsyncHandler(async function (req, res) {
     process.cwd(),
     "api",
     "errors",
-    `${email_error_name_file}.txt`
+    `${email_error_name_file}.txt`,
   );
   try {
     const data = await fs.readFile(logFile, "utf8");

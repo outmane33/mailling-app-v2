@@ -4,6 +4,9 @@ const SenderGmail = require("../models/sender_Gmail_Model");
 const Recipiente_Charter = require("../models/recipiente_Charter_Model");
 const Recipiente_RR = require("../models/recipiente_RR_Model");
 const SenderOutlook = require("../models/senderOutlookModel");
+const Recipiente_Gmail = require("../models/recipiente_Gmail_Model");
+const Recipiente_Yahoo = require("../models/recipiente_Yahoo_Model");
+const SenderBrevo = require("../models/senderBrevoModel");
 
 exports.getAllSenders = expressAsyncHandler(async (req, res) => {
   const { isp } = req.params;
@@ -15,6 +18,11 @@ exports.getAllSenders = expressAsyncHandler(async (req, res) => {
     );
   } else if (isp == "outlook") {
     emails = await SenderOutlook.find(
+      {},
+      { _id: false, email: true, app_password: true, recovery_email: true }
+    );
+  } else if (isp == "brevo") {
+    emails = await SenderBrevo.find(
       {},
       { _id: false, email: true, app_password: true, recovery_email: true }
     );
@@ -55,6 +63,8 @@ const addData = expressAsyncHandler(async function (req, res, next) {
     Recipients: {
       CHARTER: () => addRecipienteFunc(req, res, Recipiente_Charter),
       RR: () => addRecipienteFunc(req, res, Recipiente_RR),
+      GMAIL: () => addRecipienteFunc(req, res, Recipiente_Gmail),
+      YAHOO: () => addRecipienteFunc(req, res, Recipiente_Yahoo),
     },
     Senders: {
       GMAIL: () => addSendersFunc(req, res, SenderGmail),
@@ -164,15 +174,3 @@ const addRecipienteFunc = async function (req, res, Model) {
     res.status(500).send({ message: "Error adding users", error });
   }
 };
-
-//get all data
-const getAllData = expressAsyncHandler(async function addUsers(req, res) {
-  myDataNames = dataNames.filter(function (e) {
-    return !e.endsWith("counters");
-  });
-  myDataNames = myDataNames.map(function (e) {
-    return toTitleCase(e);
-  });
-
-  res.json({ data: myDataNames });
-});
